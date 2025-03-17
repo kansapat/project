@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบจัดการข้อมูลยาด้วย QR Code</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        body {
+            font-family: 'Sarabun', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        .tab-container {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            background-color: #eee;
+            border: none;
+            flex: 1;
+            text-align: center;
+        }
+        .tab.active {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        h1 {
+            color: #4CAF50;
+            text-align: center;
+        }
+        label {
+            display: block;
+            margin: 10px 0 5px;
+            color: #333;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #qrcode {
+            margin: 20px auto;
+            text-align: center;
+        }
+        .action-buttons {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        #downloadBtn {
+            background-color: #2196F3;
+        }
+        #downloadBtn:hover {
+            background-color: #0b7dda;
+        }
+        .medicine-item {
+            background-color: #f9f9f9;
+            padding: 15px;
+            margin-top: 10px;
+            border-radius: 4px;
+            border-left: 4px solid #4CAF50;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        .medicine-item.highlight {
+            background-color: #e6ffec;
+            border-left: 4px solid #FF9800;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .medicine-history {
+            margin-top: 20px;
+        }
+        .nav-link {
+            display: block;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .nav-link a {
+            color: #2196F3;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .nav-link a:hover {
+            text-decoration: underline;
+        }
+        .entry-highlight {
+            background-color: #FFF9C4;
+            padding: 5px;
+            border-radius: 3px;
+            animation: fadeHighlight 3s forwards;
+        }
+        @keyframes fadeHighlight {
+            0% { background-color: #FFF9C4; }
+            100% { background-color: transparent; }
+        }
+        .delete-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: #F44336;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .delete-btn:hover {
+            background-color: #D32F2F;
+        }
+        .delete-record-btn {
+            background-color: #F44336;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-left: 5px;
+            border: none;
+        }
+        .delete-record-btn:hover {
+            background-color: #D32F2F;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            background-color: white;
+            margin: 15% auto;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 500px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .modal-title {
+            margin-top: 0;
+            color: #333;
+        }
+        .modal-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .modal-cancel {
+            background-color: #9E9E9E;
+        }
+        .modal-delete {
+            background-color: #F44336;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ระบบจัดการข้อมูลยาด้วย QR Code</h1>
+        
+        <div class="tab-container">
+            <button class="tab active" onclick="openTab(event, 'create')">สร้าง QR Code</button>
+            <button class="tab" onclick="openTab(event, 'history')">ประวัติ</button>
+        </div>
+        
+        <div class="nav-link">
+            <a href="2.html" target="_blank">ไปที่หน้าสแกน QR Code</a>
+        </div>
+        
+        <div id="create" class="tab-content active">
+            <h2>กรอกข้อมูลยา</h2>
+            <form id="medicine-form">
+                <label for="med-name">ชื่อยา:</label>
+                <input type="text" id="med-name" required>
+                
+                <label for="med-generic">ชื่อสามัญทางยา:</label>
+                <input type="text" id="med-generic">
+                
+                <label for="med-dose">ขนาดยา:</label>
+                <input type="text" id="med-dose" placeholder="เช่น 500 mg">
+                
+                <label for="med-usage">วิธีใช้:</label>
+                <textarea id="med-usage" rows="3"></textarea>
+                
+                <label for="med-warning">คำเตือน/ข้อควรระวัง:</label>
+                <textarea id="med-warning" rows="3"></textarea>
+                
+                <button type="button" onclick="generateQRCode()">สร้าง QR Code</button>
+            </form>
+            
+            <div id="qrcode"></div>
+            
+            <div class="action-buttons" id="qr-actions" style="display:none">
+                <button id="downloadBtn" onclick="downloadQRCode()">บันทึก QR Code</button>
+                <button onclick="saveToHistory()">บันทึกข้อมูลยา</button>
+            </div>
+        </div>
+        
+        <div id="history" class="tab-content">
+            <h2>ประวัติข้อมูลยา</h2>
+            <div id="medicine-list"></div>
+        </div>
+    </div>
+    
+    <!-- Modal สำหรับยืนยันการลบ -->
+    <div id="delete-modal" class="modal">
+        <div class="modal-content">
+            <h3 class="modal-title">ยืนยันการลบข้อมูล</h3>
+            <p id="delete-message">คุณต้องการลบข้อมูลนี้ใช่หรือไม่?</p>
+            <div class="modal-buttons">
+                <button class="modal-cancel" onclick="closeDeleteModal()">ยกเลิก</button>
+                <button class="modal-delete" onclick="confirmDelete()">ลบข้อมูล</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ตัวแปรสำหรับการลบข้อมูล
+        let deleteType = ''; // 'medicine' หรือ 'record'
+        let deleteIndex = -1;
+        let deleteRecordIndex = -1;
+        
+        // ตรวจสอบว่ามีการเปิดหน้าผ่าน hash หรือไม่
+        window.addEventListener('load', function() {
+            if (window.location.hash) {
+                if (window.location.hash === '#history') {
+                    // เปิดแท็บประวัติ
+                    const historyTab = document.querySelector('.tab:nth-child(2)');
+                    if (historyTab) {
+                        openTab({ currentTarget: historyTab }, 'history');
+                    }
+                }
+            }
+        });
+        
+        function openTab(evt, tabName) {
+            const tabcontent = document.getElementsByClassName("tab-content");
+            for (let i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].classList.remove("active");
+            }
+            
+            const tablinks = document.getElementsByClassName("tab");
+            for (let i = 0; i < tablinks.length; i++) {
+                tablinks[i].classList.remove("active");
+            }
+            
+            document.getElementById(tabName).classList.add("active");
+            evt.currentTarget.classList.add("active");
+            
+            if (tabName === 'history') {
+                loadMedicineHistory();
+            }
+        }
+        
+        function generateQRCode() {
+            const medName = document.getElementById('med-name').value;
+            if (!medName) {
+                alert('กรุณากรอกชื่อยา');
+                return;
+            }
+            
+            const medData = {
+                name: medName,
+                generic: document.getElementById('med-generic').value,
+                dose: document.getElementById('med-dose').value,
+                usage: document.getElementById('med-usage').value,
+                warning: document.getElementById('med-warning').value,
+                createdAt: new Date().toISOString()
+            };
+            
+            const qrcodeDiv = document.getElementById('qrcode');
+            qrcodeDiv.innerHTML = '';
+            
+            new QRCode(qrcodeDiv, {
+                text: JSON.stringify(medData),
+                width: 200,
+                height: 200,
+                colorDark: '#000000',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.H
+            });
+            
+            document.getElementById('qr-actions').style.display = 'flex';
+        }
+        
+        function downloadQRCode() {
+            const canvas = document.querySelector('#qrcode canvas');
+            const medName = document.getElementById('med-name').value;
+            
+            if (canvas) {
+                const link = document.createElement('a');
+                link.download = `qr-${medName.replace(/\s+/g, '-')}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            }
+        }
+        
+        function saveToHistory() {
+            const medName = document.getElementById('med-name').value;
+            if (!medName) return;
+            
+            const medData = {
+                name: medName,
+                generic: document.getElementById('med-generic').value,
+                dose: document.getElementById('med-dose').value,
+                usage: document.getElementById('med-usage').value,
+                warning: document.getElementById('med-warning').value,
+                createdAt: new Date().toISOString(),
+                usageRecords: []
+            };
+            
+            let medicines = JSON.parse(localStorage.getItem('medicines') || '[]');
+            medicines.push(medData);
+            localStorage.setItem('medicines', JSON.stringify(medicines));
+            
+            alert(`บันทึกข้อมูลยา ${medName} เรียบร้อยแล้ว`);
+        }
+        
+        function loadMedicineHistory() {
+            const medicines = JSON.parse(localStorage.getItem('medicines') || '[]');
+            const historyContainer = document.getElementById('medicine-list');
+            
+            if (medicines.length === 0) {
+                historyContainer.innerHTML = '<p>ยังไม่มีประวัติข้อมูลยา</p>';
+                return;
+            }
+            
+            let historyHTML = '';
+            
+            // ตรวจสอบว่ามียาที่เพิ่งถูกสแกนหรือไม่
+            const lastViewedMedicine = localStorage.getItem('lastViewedMedicine');
+            let lastViewedIndex = -1;
+            if (lastViewedMedicine !== null) {
+                lastViewedIndex = parseInt(lastViewedMedicine);
+            }
+            
+            medicines.forEach((med, index) => {
+                let usageHTML = '';
+                
+                if (med.usageRecords && med.usageRecords.length > 0) {
+                    usageHTML = '<h4>ประวัติการใช้ยา:</h4><ul>';
+                    
+                    // จัดเรียงประวัติการใช้ยาตามวันที่ล่าสุด
+                    const sortedRecords = [...med.usageRecords].sort((a, b) => {
+                        return new Date(b.recordedAt) - new Date(a.recordedAt);
+                    });
+                    
+                    sortedRecords.forEach((record, recordIndex) => {
+                        // ตรวจสอบว่าเป็นรายการล่าสุดของยาที่เพิ่งถูกสแกนหรือไม่
+                        let isLatestRecord = (index === lastViewedIndex && recordIndex === 0);
+                        
+                        usageHTML += `
+                            <li class="${isLatestRecord ? 'entry-highlight' : ''}">
+                                <strong>วันที่:</strong> ${record.date} 
+                                <strong>ปริมาณ:</strong> ${record.amount || '-'} 
+                                <strong>บันทึก:</strong> ${record.note || '-'}
+                                ${isLatestRecord ? '<span style="color: #FF9800; font-weight: bold;"> (เพิ่มล่าสุด)</span>' : ''}
+                                <button class="delete-record-btn" onclick="showDeleteRecordConfirmation(${index}, ${recordIndex})">ลบ</button>
+                            </li>
+                        `;
+                    });
+                    usageHTML += '</ul>';
+                } else {
+                    usageHTML = '<p>ยังไม่มีประวัติการใช้ยา</p>';
+                }
+                
+                // เพิ่ม class highlight หากเป็นยาที่เพิ่งถูกสแกน
+                const isHighlighted = (index === lastViewedIndex) ? 'highlight' : '';
+                
+                historyHTML += `
+                    <div id="medicine-${index}" class="medicine-item ${isHighlighted}">
+                        <button class="delete-btn" onclick="showDeleteMedicineConfirmation(${index})">ลบ</button>
+                        <h3>${med.name}</h3>
+                        <p><strong>ชื่อสามัญทางยา:</strong> ${med.generic || '-'}</p>
+                        <p><strong>ขนาดยา:</strong> ${med.dose || '-'}</p>
+                        <p><strong>วิธีใช้:</strong> ${med.usage || '-'}</p>
+                        <div class="medicine-history">
+                            ${usageHTML}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            historyContainer.innerHTML = historyHTML;
+            
+            // เลื่อนไปยังยาที่เพิ่งถูกสแกน
+            if (lastViewedIndex >= 0) {
+                setTimeout(() => {
+                    const highlightedItem = document.getElementById(`medicine-${lastViewedIndex}`);
+                    if (highlightedItem) {
+                        highlightedItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                    
+                    // ล้างค่า lastViewedMedicine เพื่อไม่ให้ไฮไลท์ในครั้งต่อไป
+                    localStorage.removeItem('lastViewedMedicine');
+                }, 300);
+            }
+        }
+        
+        // แสดง modal ยืนยันการลบข้อมูลยา
+        function showDeleteMedicineConfirmation(index) {
+            const medicines = JSON.parse(localStorage.getItem('medicines') || '[]');
+            if (index >= 0 && index < medicines.length) {
+                deleteType = 'medicine';
+                deleteIndex = index;
+                
+                document.getElementById('delete-message').textContent = 
+                    `คุณต้องการลบข้อมูลยา "${medicines[index].name}" และประวัติการใช้ทั้งหมดใช่หรือไม่?`;
+                
+                document.getElementById('delete-modal').style.display = 'block';
+            }
+        }
+        
+        // แสดง modal ยืนยันการลบประวัติการใช้ยา
+        function showDeleteRecordConfirmation(medIndex, recordIndex) {
+            const medicines = JSON.parse(localStorage.getItem('medicines') || '[]');
+            if (medIndex >= 0 && medIndex < medicines.length) {
+                const med = medicines[medIndex];
+                if (med.usageRecords && recordIndex >= 0 && recordIndex < med.usageRecords.length) {
+                    deleteType = 'record';
+                    deleteIndex = medIndex;
+                    deleteRecordIndex = recordIndex;
+                    
+                    // จัดเรียงประวัติการใช้ยาตามวันที่ล่าสุด
+                    const sortedRecords = [...med.usageRecords].sort((a, b) => {
+                        return new Date(b.recordedAt) - new Date(a.recordedAt);
+                    });
+                    
+                    const record = sortedRecords[recordIndex];
+                    document.getElementById('delete-message').textContent = 
+                        `คุณต้องการลบประวัติการใช้ยา "${med.name}" วันที่ ${record.date} ปริมาณ ${record.amount || '-'} ใช่หรือไม่?`;
+                    
+                    document.getElementById('delete-modal').style.display = 'block';
+                }
+            }
+        }
+        
+        // ปิด modal ยืนยันการลบ
+        function closeDeleteModal() {
+            document.getElementById('delete-modal').style.display = 'none';
+            deleteType = '';
+            deleteIndex = -1;
+            deleteRecordIndex = -1;
+        }
+        
+        // ยืนยันการลบข้อมูล
+        function confirmDelete() {
+            const medicines = JSON.parse(localStorage.getItem('medicines') || '[]');
+            
+            if (deleteType === 'medicine' && deleteIndex >= 0 && deleteIndex < medicines.length) {
+                // ลบข้อมูลยา
+                medicines.splice(deleteIndex, 1);
+                localStorage.setItem('medicines', JSON.stringify(medicines));
+                loadMedicineHistory();
+            } 
+            else if (deleteType === 'record' && deleteIndex >= 0 && deleteIndex < medicines.length) {
+                // ลบประวัติการใช้ยา
+                const med = medicines[deleteIndex];
+                if (med.usageRecords) {
+                    // จัดเรียงประวัติการใช้ยาตามวันที่ล่าสุด และค้นหา index ที่แท้จริง
+                    const sortedRecords = [...med.usageRecords].sort((a, b) => {
+                        return new Date(b.recordedAt) - new Date(a.recordedAt);
+                    });
+                    
+                    if (deleteRecordIndex >= 0 && deleteRecordIndex < sortedRecords.length) {
+                        // หา recordedAt ของรายการที่ต้องการลบจากลำดับที่จัดเรียงแล้ว
+                        const targetRecordedAt = sortedRecords[deleteRecordIndex].recordedAt;
+                        
+                        // หา index ของรายการใน array จริงโดยเทียบกับ recordedAt
+                        const actualIndex = med.usageRecords.findIndex(r => r.recordedAt === targetRecordedAt);
+                        
+                        if (actualIndex !== -1) {
+                            med.usageRecords.splice(actualIndex, 1);
+                            medicines[deleteIndex] = med;
+                            localStorage.setItem('medicines', JSON.stringify(medicines));
+                            loadMedicineHistory();
+                        }
+                    }
+                }
+            }
+            
+            closeDeleteModal();
+        }
+    </script>
+</body>
+</html>

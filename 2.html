@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบสแกน QR Code ข้อมูลยา</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.4/html5-qrcode.min.js"></script>
+    <style>
+        body {
+            font-family: 'Sarabun', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        .scan-options {
+            display: flex;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        h1 {
+            color: #4CAF50;
+            text-align: center;
+        }
+        label {
+            display: block;
+            margin: 10px 0 5px;
+            color: #333;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #reader {
+            width: 100%;
+            margin: 20px 0;
+        }
+        #scan-result {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+            display: none;
+        }
+        .medicine-info {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f0f8ff;
+            border-radius: 4px;
+        }
+        .medicine-form {
+            margin-top: 20px;
+        }
+        .nav-link {
+            display: block;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .nav-link a {
+            color: #2196F3;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .nav-link a:hover {
+            text-decoration: underline;
+        }
+        .back-button {
+            background-color: #2196F3;
+            display: block;
+            margin: 0 auto;
+        }
+        .success-message {
+            display: none;
+            background-color: #DFF2BF;
+            color: #4F8A10;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .action-buttons {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ระบบสแกน QR Code ข้อมูลยา</h1>
+        
+        <div class="nav-link">
+            <a href="1.html">กลับไปหน้าหลัก</a>
+        </div>
+        
+        <div class="scan-options">
+            <button onclick="startScanner()" style="margin-right: 10px;">สแกนด้วยกล้อง</button>
+            <div style="display: flex; align-items: center;">
+                <label for="qr-image-input" style="cursor: pointer; background-color: #2196F3; color: white; padding: 10px 15px; border-radius: 4px; margin-right: 10px;">อัปโหลดภาพ QR Code</label>
+                <input type="file" id="qr-image-input" accept="image/*" style="display: none;" onchange="scanImageQR(this)">
+                <span id="image-name"></span>
+            </div>
+        </div>
+        
+        <div id="reader" style="margin-top: 20px;"></div>
+        
+        <div id="scan-result">
+            <div class="medicine-info" id="scanned-info"></div>
+            
+            <div class="medicine-form">
+                <h3>บันทึกปริมาณการใช้ยา</h3>
+                <label for="usage-date">วันที่ใช้ยา:</label>
+                <input type="date" id="usage-date">
+                
+                <label for="usage-amount">ปริมาณที่ใช้:</label>
+                <input type="text" id="usage-amount" placeholder="เช่น 1 เม็ด">
+                
+                <label for="usage-note">บันทึกเพิ่มเติม:</label>
+                <textarea id="usage-note" rows="2"></textarea>
+                
+                <button onclick="saveUsageRecord()">บันทึกการใช้ยา</button>
+            </div>
+            
+            <div id="success-message" class="success-message">
+                <p>บันทึกการใช้ยาเรียบร้อยแล้ว!</p>
+                <div class="action-buttons">
+                    <button onclick="scanAgain()" style="background-color: #2196F3;">สแกนอีกครั้ง</button>
+                    <button onclick="goToHistory()" style="background-color: #FF9800;">ดูประวัติการใช้ยา</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentScannedMedicine = null;
+        let html5QrCodeScanner = null;
+        
+        // ตรวจสอบว่าโค้ดนี้ทำงานบนหน้า scanner.html หรือไม่
+        window.addEventListener('load', function() {
+            // รีเซ็ตการแสดงผล
+            document.getElementById('scan-result').style.display = 'none';
+            document.getElementById('success-message').style.display = 'none';
+        });
+        
+        function startScanner() {
+            // รีเซ็ตข้อความสำเร็จและซ่อนผลลัพธ์
+            document.getElementById('success-message').style.display = 'none';
+            document.getElementById('scan-result').style.display = 'none';
+            
+            // หยุดการสแกนก่อนหน้านี้ (ถ้ามี)
+            if (html5QrCodeScanner) {
+                html5QrCodeScanner.stop().catch(error => console.error(error));
+            }
+            
+            // เคลียร์ reader div
+            document.getElementById('reader').innerHTML = '';
+            
+            html5QrCodeScanner = new Html5Qrcode("reader");
+            const qrCodeSuccessCallback = (decodedText, decodedResult) => {
+                try {
+                    const medData = JSON.parse(decodedText);
+                    displayScannedResult(medData);
+                    html5QrCodeScanner.stop();
+                } catch (error) {
+                    alert('QR Code ไม่ถูกต้องหรือไม่มีข้อมูลยา');
+                }
+            };
+            
+            const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+            html5QrCodeScanner.start({ facingMode: "environment" }, config, qrCodeSuccessCallback)
+                .catch(err => {
+                    console.error(`เริ่มสแกนไม่สำเร็จ: ${err}`);
+                    alert('ไม่สามารถเริ่มสแกนกล้องได้ โปรดตรวจสอบว่าอนุญาตให้เข้าถึงกล้องแล้ว');
+                });
+        }
+        
+        function scanImageQR(fileInput) {
+            // รีเซ็ตข้อความสำเร็จและซ่อนผลลัพธ์
+            document.getElementById('success-message').style.display = 'none';
+            document.getElementById('scan-result').style.display = 'none';
+            
+            // แสดงชื่อไฟล์ที่เลือก
+            if (fileInput.files && fileInput.files[0]) {
+                document.getElementById('image-name').textContent = fileInput.files[0].name;
+            }
+            
+            // หยุดการสแกนด้วยกล้อง (ถ้ามี)
+            if (html5QrCodeScanner) {
+                html5QrCodeScanner.stop().catch(error => console.error(error));
+            }
+            
+            const file = fileInput.files[0];
+            if (!file) {
+                return;
+            }
+            
+            // เคลียร์ reader div
+            document.getElementById('reader').innerHTML = '';
+            
+            // สร้าง instance ใหม่
+            html5QrCodeScanner = new Html5Qrcode("reader");
+            
+            html5QrCodeScanner.scanFile(file, true)
+                .then(decodedText => {
+                    try {
+                        const medData = JSON.parse(decodedText);
+                        displayScannedResult(medData);
+                    } catch (error) {
+                        alert('QR Code ไม่ถูกต้องหรือไม่มีข้อมูลยา');
+                    }
+                })
+                .catch(err => {
+                    console.error(`สแกนภาพไม่สำเร็จ: ${err}`);
+                    alert('ไม่พบ QR Code ในภาพ หรือภาพไม่ชัดเจน');
+                });
+        }
+        
+        function displayScannedResult(medData) {
+            currentScannedMedicine = medData;
+            
+            let infoHTML = `
+                <h3>ข้อมูลยา: ${medData.name}</h3>
+                <p><strong>ชื่อสามัญทางยา:</strong> ${medData.generic || '-'}</p>
+                <p><strong>ขนาดยา:</strong> ${medData.dose || '-'}</p>
+                <p><strong>วิธีใช้:</strong> ${medData.usage || '-'}</p>
+                <p><strong>คำเตือน/ข้อควรระวัง:</strong> ${medData.warning || '-'}</p>
+            `;
+            
+            document.getElementById('scanned-info').innerHTML = infoHTML;
+            document.getElementById('scan-result').style.display = 'block';
+            document.getElementById('success-message').style.display = 'none';
+            
+            // ตั้งค่าวันที่ปัจจุบัน
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('usage-date').value = today;
+        }
+        
+        function saveUsageRecord() {
+            if (!currentScannedMedicine) return;
+            
+            const usageAmount = document.getElementById('usage-amount').value;
+            if (!usageAmount) {
+                alert('กรุณากรอกปริมาณยาที่ใช้');
+                return;
+            }
+            
+            const usageData = {
+                date: document.getElementById('usage-date').value,
+                amount: usageAmount,
+                note: document.getElementById('usage-note').value,
+                recordedAt: new Date().toISOString()
+            };
+            
+            let medicines = JSON.parse(localStorage.getItem('medicines') || '[]');
+            
+            // ค้นหายาในประวัติ
+            let found = false;
+            let medicineIndex = -1;
+            
+            for (let i = 0; i < medicines.length; i++) {
+                if (medicines[i].name === currentScannedMedicine.name) {
+                    if (!medicines[i].usageRecords) {
+                        medicines[i].usageRecords = [];
+                    }
+                    medicines[i].usageRecords.push(usageData);
+                    found = true;
+                    medicineIndex = i;
+                    break;
+                }
+            }
+            
+            // ถ้าไม่พบ ให้สร้างรายการใหม่
+            if (!found) {
+                currentScannedMedicine.usageRecords = [usageData];
+                medicines.push(currentScannedMedicine);
+                medicineIndex = medicines.length - 1;
+            }
+            
+            // จัดเก็บข้อมูลลงใน localStorage
+            localStorage.setItem('medicines', JSON.stringify(medicines));
+            
+            // เก็บข้อมูลที่ต้องการแสดงในประวัติเมื่อกดปุ่ม "ดูประวัติ"
+            localStorage.setItem('lastViewedMedicine', medicineIndex.toString());
+            
+            // แสดงข้อความสำเร็จและซ่อนฟอร์ม
+            document.getElementById('success-message').style.display = 'block';
+            
+            // เคลียร์ฟอร์ม
+            document.getElementById('usage-amount').value = '';
+            document.getElementById('usage-note').value = '';
+        }
+        
+        function scanAgain() {
+            // ซ่อนผลลัพธ์และข้อความสำเร็จ
+            document.getElementById('scan-result').style.display = 'none';
+            document.getElementById('success-message').style.display = 'none';
+            
+            // เริ่มสแกนใหม่อีกครั้ง
+            startScanner();
+        }
+        
+        function goToHistory() {
+            // นำผู้ใช้ไปยังหน้าประวัติ
+            window.location.href = '1.html#history';
+        }
+    </script>
+</body>
+</html>
